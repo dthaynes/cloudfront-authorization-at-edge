@@ -31,9 +31,9 @@ Metadata:
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
-  EmailAddress:
+  Username:
     Type: String
-    Description: The email address of the user that will be created in the Cognito User Pool. Leave empty to skip user creation.
+    Description: The username of the user that will be created in the Cognito User Pool. Leave empty to skip user creation.
     Default: ""
   RedirectPathSignIn:
     Type: String
@@ -74,18 +74,12 @@ Parameters:
   OAuthScopes:
     Type: CommaDelimitedList
     Description: The OAuth scopes to request the User Pool to add to the access token JWT
-    Default: "phone, email, profile, openid, aws.cognito.signin.user.admin"
+    Default: "profile, openid"
   HttpHeaders:
     Type: String
     Description: The HTTP headers to set on all responses from CloudFront. To be provided as a JSON object
     Default: >-
       {
-        "Content-Security-Policy": "default-src 'none'; img-src 'self'; script-src 'self' https://code.jquery.com https://stackpath.bootstrapcdn.com; style-src 'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
-        "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
-        "Referrer-Policy": "same-origin",
-        "X-XSS-Protection": "1; mode=block",
-        "X-Frame-Options": "DENY",
-        "X-Content-Type-Options": "nosniff"
       }
   EnableSPAMode:
     Type: String
@@ -145,7 +139,7 @@ Parameters:
     Description: >
       Specify a group that users have to be part of to view the private site. Use this to further protect your private site, in case you don't want every user in the User Pool to have access.
       The UserPoolGroup will be created if the UserPool is also created (that happens when no UserPoolArn is set).
-      If the UserPoolGroup is created and the default user is also created (when you specify EmailAddress), that user will also be added to the group.
+      If the UserPoolGroup is created and the default user is also created (when you specify Username), that user will also be added to the group.
     Default: ""
   Version:
     Type: String
@@ -179,7 +173,7 @@ Parameters:
   DefaultRootObject:
     Description: The object that you want CloudFront to request from your origin (for example, index.html) when a viewer requests the root URL for your distribution (http://www.example.com).
     Type: String
-    Default: index.html
+    Default: ""
   S3OriginDomainName:
     Description: >
       The S3 origin you want to front with CloudFront. Specify the bucket's region specific hostname, i.e. <bucket-name>.s3.<region>.amazonaws.com,
@@ -222,7 +216,7 @@ Conditions:
   ApplyPermissionsBoundary:
     !Not [!Equals [!Ref PermissionsBoundaryPolicyArn, ""]]
   CreateUser: !And
-    - !Not [!Equals [!Ref EmailAddress, ""]]
+    - !Not [!Equals [!Ref Username, ""]]
     - !Equals [!Ref UserPoolArn, ""]
     - !Equals [!Ref UserPoolClientId, ""]
   CreateCloudFrontDistribution:
@@ -649,9 +643,16 @@ Resources:
     Properties:
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
+      EmailConfiguration:
+        ReplyToEmailAddress: "dan@triniumx.comn"
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 6
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: true
       UserPoolName: !Ref AWS::StackName
-      UsernameAttributes:
-        - email
 
   UserPoolGroup:
     Type: AWS::Cognito::UserPoolGroup
@@ -664,7 +665,8 @@ Resources:
     Type: AWS::Cognito::UserPoolUser
     Condition: CreateUser
     Properties:
-      Username: !Ref EmailAddress
+      MessageAction: SUPPRESS
+      Username: !Ref Username
       UserPoolId: !Ref UserPool
 
   UserPoolGroupAttachment:
@@ -672,7 +674,7 @@ Resources:
     Condition: AttachUserToPoolGroup
     Properties:
       GroupName: !Ref UserPoolGroupName
-      Username: !Ref EmailAddress
+      Username: !Ref Username
       UserPoolId: !Ref UserPool
 
   UserPoolClient:
