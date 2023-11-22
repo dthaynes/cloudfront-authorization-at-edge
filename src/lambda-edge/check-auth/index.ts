@@ -3,19 +3,41 @@
 
 import { stringify as stringifyQueryString } from "querystring";
 import { createHash } from "crypto";
-import { CloudFrontRequestHandler } from "aws-lambda";
+import { CloudFrontRequestHandler, CloudFrontRequest } from "aws-lambda";
 import * as common from "../shared/shared";
 
 const CONFIG = common.getConfigWithJwtVerifier();
 CONFIG.logger.debug("Configuration loaded:", CONFIG);
 
+function updateRequestUri(request: CloudFrontRequest) {
+  var uri = request.uri;
+
+  // Check whether the URI is missing a file name.
+  if (uri.endsWith('/')) {
+    request.uri += 'index.html';
+  }
+  // Check whether the URI is missing a file extension.
+  else if (!uri.includes('.')) {
+    var index = uri.indexOf('/?');
+    if (index < 0) {
+      request.uri += '/index.html';
+    } else {
+      //handle query string
+      request.uri = request.uri.slice(0, index) + "/index.html" + request.uri.slice(index + 1);
+    }
+  }
+
+  return request;
+}
+
 export const handler: CloudFrontRequestHandler = async (event) => {
   CONFIG.logger.debug("Event:", event);
   const request = event.Records[0].cf.request;
+  updateRequestUri(request);
+
   const domainName = request.headers["host"][0].value;
-  const requestedUri = `${request.uri}${
-    request.querystring ? "?" + request.querystring : ""
-  }`;
+  const requestedUri = `${request.uri}${request.querystring ? "?" + request.querystring : ""
+    }`;
   try {
     const cookies = common.extractAndParseCookies(
       request.headers,
@@ -114,9 +136,8 @@ function redirectToCognitoHostedUI({
         ...getNonceCookies({ nonce, ...CONFIG }),
         {
           key: "set-cookie",
-          value: `spa-auth-edge-pkce=${encodeURIComponent(state.pkce)}; ${
-            CONFIG.cookieSettings.nonce
-          }`,
+          value: `spa-auth-edge-pkce=${encodeURIComponent(state.pkce)}; ${CONFIG.cookieSettings.nonce
+            }`,
         },
       ],
       ...CONFIG.cloudFrontHeaders,
@@ -141,9 +162,8 @@ function redirectToRefreshPath({
       location: [
         {
           key: "location",
-          value: `https://${domainName}${
-            CONFIG.redirectPathAuthRefresh
-          }?${stringifyQueryString({ requestedUri, nonce })}`,
+          value: `https://${domainName}${CONFIG.redirectPathAuthRefresh
+            }?${stringifyQueryString({ requestedUri, nonce })}`,
         },
       ],
       "set-cookie": getNonceCookies({ nonce, ...CONFIG }),
@@ -202,9 +222,8 @@ function getNonceCookies({
   return [
     {
       key: "set-cookie",
-      value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${
-        cookieSettings.nonce
-      }`,
+      value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${cookieSettings.nonce
+        }`,
     },
     {
       key: "set-cookie",
