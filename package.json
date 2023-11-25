@@ -11,8 +11,9 @@
     "build": "npm run tsc && npm run webpack",
     "sam-build": "sam build",
     "sam-package": "sam package --output-template-file packaged.yaml --s3-bucket com.triniumx.sam-deployment",
-    "sam-deploy": "sam deploy --s3-bucket com.triniumx.sam-deployment --stack-name heber2nd-test2 --capabilities CAPABILITY_IAM --parameter-overrides Username=member",
+    "sam-deploy": "if test $npm_config_stack_name; then sam deploy --s3-bucket com.triniumx.sam-deployment --stack-name $npm_config_stack_name --capabilities CAPABILITY_IAM --parameter-overrides Username=member; else echo stack_name argument is required; fi",
     "set-password": "if test $npm_config_pool_id && test $npm_config_password; then aws cognito-idp admin-set-user-password --user-pool-id $npm_config_pool_id --username \"member\" --password $npm_config_password --permanent; else echo pool_id and password arguments are required; fi",
+    "configure-signin": "if test $npm_config_pool_id; then node ./src/cfn-custom-resources/user-pool-ui/index.js $npm_config_pool_id; else echo pool_id argument is required; fi",
     "update-dependencies": "for DIR in . $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*) src/cfn-custom-resources/react-app/react-app/; do [ ! -f ${DIR}/package.json ] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && rm -rf node_modules package-lock.json && npm install --prune); done;",
     "postinstall": "for DIR in $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*); do [ ! -f ${DIR}/package.json ] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && npm install --prune --ignore-scripts); done",
     "audit-fix": "for DIR in . $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*) src/cfn-custom-resources/react-app/react-app/; do [ ! -f ${DIR}/package.json ] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && npm audit fix); done"
